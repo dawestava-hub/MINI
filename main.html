@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MUZAMIL-XMD— WhatsApp Bot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.7/axios.min.js"></script>
+<style>
+/* ─── TOKENS ─── */
+:root {
+  --bg: #050507;
+  --surface: rgba(255,255,255,.03);
+  --border: rgba(255,255,255,.08);
+  --accent: #e8001e;
+  --accent2: #ff4060;
+  --gold: #ffd166;
+  --text: #f0eee9;
+  --muted: rgba(240,238,233,.45);
+  --radius: 20px;
+  --mono: 'Space Mono', monospace;
+  --display: 'Syne', sans-serif;
+}
+
+/* ─── RESET ─── */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+
+/* ─── BODY ─── */
+body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--display);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* ─── AMBIENT BACKGROUND ─── */
+.bg-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.bg-layer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 20%, rgba(232,0,30,.12) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 60% at 80% 80%, rgba(255,64,96,.08) 0%, transparent 70%);
+}
+.bg-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
+}
+.grain {
+  position: absolute;
+  inset: 0;
+  opacity: .45;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
+  background-size: 256px;
+}
+
+/* ─── WRAPPER ─── */
+#app {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 460px;
+  padding: 24px 16px;
+}
+
+/* ─── PAGES ─── */
+.page { display: none; animation: fadeUp .4s ease forwards; }
+.page.active { display: block; }
+
+@keyframes fadeUp {
+  from { opacity:0; transform: translateY(18px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+
+/* ─── CARD ─── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 36px 32px;
+  backdrop-filter: blur(24px);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.04) inset,
+    0 32px 80px rgba(0,0,0,.6),
+    0 0 60px rgba(232,0,30,.06);
+  position: relative;
+  overflow: hidden;
+}
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(232,0,30,.6), transparent);
+}
+
+/* ─── BADGE ─── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(232,0,30,.12);
+  border: 1px solid rgba(232,0,30,.25);
+  border-radius: 99px;
+  padding: 5px 14px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--accent2);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-bottom: 22px;
+}
+.badge-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent2);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity:1; box-shadow: 0 0 0 0 rgba(255,64,96,.5); }
+  50% { opacity:.6; box-shadow: 0 0 0 5px rgba(255,64,96,0); }
+}
+
+/* ─── AVATAR ─── */
+.avatar-wrap {
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 26px;
+  position: relative;
+}
+.avatar-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, var(--accent), #ff8800, var(--gold), var(--accent2), var(--accent));
+  animation: spin 5s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.avatar-inner {
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--bg);
+}
+.avatar-inner img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+/* ─── HEADINGS ─── */
+.headline {
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 26px;
+  letter-spacing: -.02em;
+  line-height: 1.1;
+  margin-bottom: 6px;
+}
+.headline span { color: var(--accent); }
+.subline {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  margin-bottom: 30px;
+}
+
+/* ─── STAT BAR ─── */
+.stat-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 20px;
+  margin-top: 24px;
+}
+.stat-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+.stat-value {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--gold);
+  text-shadow: 0 0 20px rgba(255,209,102,.4);
+}
+.stat-icon {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* ─── BUTTONS ─── */
+.btn-primary {
+  width: 100%;
+  padding: 15px 20px;
+  margin-top: 14px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+  color: white;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform .2s, box-shadow .2s;
+}
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(255,255,255,.15), transparent);
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(232,0,30,.45);
+}
+.btn-primary:active { transform: translateY(0); }
+
+.btn-secondary {
+  width: 100%;
+  padding: 12px 20px;
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color .2s, color .2s;
+}
+.btn-secondary:hover {
+  border-color: rgba(255,255,255,.25);
+  color: var(--text);
+}
+
+/* ─── INPUTS ─── */
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+.input-row {
+  position: relative;
+}
+.input-row i {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 13px;
+  pointer-events: none;
+}
+.input-row input {
+  width: 100%;
+  padding: 13px 16px 13px 42px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  outline: none;
+  transition: border-color .2s, background .2s;
+}
+.input-row input::placeholder { color: rgba(240,238,233,.2); }
+.input-row input:focus {
+  border-color: rgba(232,0,30,.45);
+  background: rgba(232,0,30,.05);
+}
+
+/* ─── DIVIDER ─── */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .1em;
+}
+.divider::before, .divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ─── PAIR RESULT ─── */
+.pair-result {
+  margin-top: 16px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+  transition: all .3s;
+  cursor: pointer;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pair-result.has-code {
+  border-color: rgba(232,0,30,.35);
+  background: rgba(232,0,30,.06);
+  color: var(--gold);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: .15em;
+  text-shadow: 0 0 20px rgba(255,209,102,.5);
+}
+.pair-result.error {
+  border-color: rgba(255,100,100,.3);
+  color: rgba(255,120,120,.8);
+  font-size: 12px;
+}
+
+/* ─── TOOLBAR ─── */
+.toolbar {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  gap: 10px;
+  z-index: 99;
+}
+.toolbar-btn {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.05);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 15px;
+  text-decoration: none;
+  backdrop-filter: blur(12px);
+  transition: all .2s;
+}
+.toolbar-btn:hover {
+  background: rgba(232,0,30,.15);
+  border-color: rgba(232,0,30,.4);
+  color: var(--accent2);
+  transform: scale(1.08);
+}
+
+/* ─── STEP INDICATOR ─── */
+.steps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 28px;
+}
+.step {
+  height: 3px;
+  border-radius: 99px;
+  background: var(--border);
+  flex: 1;
+  transition: background .3s;
+}
+.step.done { background: var(--accent); }
+.step.active { background: var(--accent2); }
+
+/* ─── TAG LINE ─── */
+.tag-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+  justify-content: center;
+}
+.tag {
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 4px 12px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: .06em;
+}
+
+audio { display: none; }
+</style>
+</head>
+
+<body>
+
+<!-- BG -->
+<div class="bg-layer">
+  <div class="bg-grid"></div>
+  <div class="grain"></div>
+</div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <a href="https://wa.me/92318392889" target="_blank" class="toolbar-btn" title="WhatsApp">
+    <i class="fab fa-whatsapp"></i>
+  </a>
+  <a href="#" class="toolbar-btn" title="Community">
+    <i class="fas fa-users"></i>
+  </a>
+  <a href="#" class="toolbar-btn" title="Announcements">
+    <i class="fas fa-bullhorn"></i>
+  </a>
+</div>
+
+<div id="app">
+
+  <!-- ── HOME ── -->
+  <div id="homePage" class="page active">
+    <div class="card">
+      <div style="text-align:center">
+        <div class="badge">
+          <span class="badge-dot"></span>
+          System Online
+        </div>
+
+        <div class="avatar-wrap">
+          <div class="avatar-ring"></div>
+          <div class="avatar-inner">
+            <img src="https://res.cloudinary.com/di2a9lenz/image/upload/v1777634329/omegatech_media/d7riz8sz6yq3avzq7vaf.jpg" alt="MUZAMIL-XMD">
+          </div>
+        </div>
+
+        <div class="headline">MUZAMI <span>XMD</span></div>
+        <div class="subline">WhatsApp Automation Bot</div>
+
+        <div class="tag-row">
+          <span class="tag">⚡ Fast</span>
+          <span class="tag">🔐 Secure</span>
+          <span class="tag">🤖 Advanced</span>
+        </div>
+      </div>
+
+      <button class="btn-primary" onclick="switchPage('ownerPage', 1)">
+        <i class="fas fa-user-plus" style="margin-right:8px"></i>
+        Add Owner Details
+      </button>
+
+      <div class="stat-bar">
+        <div>
+          <div class="stat-label">Active Bots</div>
+          <div class="stat-value" id="botCount">128</div>
+        </div>
+        <i class="fas fa-robot stat-icon"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── OWNER ── -->
+  <div id="ownerPage" class="page">
+    <div class="card">
+      <div class="steps">
+        <div class="step done"></div>
+        <div class="step active"></div>
+        <div class="step"></div>
+      </div>
+
+      <div class="badge">
+        <span class="badge-dot"></span>
+        Step 1 of 2
+      </div>
+
+      <div class="headline" style="margin-bottom:6px">Owner <span>Profile</span></div>
+      <div class="subline">Enter your details to continue</div>
+
+      <div class="input-group">
+        <div class="input-row">
+          <i class="fas fa-user"></i>
+          <input placeholder="Full Name" id="ownerName">
+        </div>
+        <div class="input-row">
+          <i class="fas fa-phone"></i>
+          <input placeholder="Phone Number" id="ownerPhone">
+        </div>
+        <div class="input-row">
+          <i class="fas fa-envelope"></i>
+          <input placeholder="Email Address" id="ownerEmail">
+        </div>
+      </div>
+
+      <button class="btn-primary" onclick="switchPage('pairPage', 2)">
+        Continue <i class="fas fa-arrow-right" style="margin-left:8px"></i>
+      </button>
+      <button class="btn-secondary" onclick="switchPage('homePage', 0)">
+        <i class="fas fa-arrow-left" style="margin-right:6px"></i> Back
+      </button>
+
+      <div class="stat-bar" style="margin-top:18px">
+        <div>
+          <div class="stat-label">Active Bots</div>
+          <div class="stat-value" id="botCountOwner">128</div>
+        </div>
+        <i class="fas fa-robot stat-icon"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAIR ── -->
+  <div id="pairPage" class="page">
+    <div class="card">
+      <div class="steps">
+        <div class="step done"></div>
+        <div class="step done"></div>
+        <div class="step active"></div>
+      </div>
+
+      <div class="badge">
+        <span class="badge-dot"></span>
+        Step 2 of 2
+      </div>
+
+      <div class="headline" style="margin-bottom:6px">Pair <span>Code</span></div>
+      <div class="subline">Link your WhatsApp account</div>
+
+      <div class="input-group">
+        <div class="input-row">
+          <i class="fas fa-mobile-alt"></i>
+          <input id="number" placeholder="+94 77 000 0000" type="tel">
+        </div>
+      </div>
+
+      <button class="btn-primary" id="submit">
+        <i class="fas fa-key" style="margin-right:8px"></i>
+        Generate Code
+      </button>
+
+      <div class="divider">or tap code to copy</div>
+
+      <div class="pair-result" id="pair" onclick="copyCode()">
+        Your pairing code will appear here
+      </div>
+
+      <button class="btn-secondary" onclick="switchPage('ownerPage', 1)">
+        <i class="fas fa-arrow-left" style="margin-right:6px"></i> Back
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- AUDIO -->
+<audio id="bgMusic" loop>
+  <source src="https://files.catbox.moe/6nwx91.mp4" type="audio/mpeg">
+</audio>
+
+<script>
+// ── MUSIC ──
+const music = document.getElementById('bgMusic');
+music.volume = 0.3;
+window.addEventListener('load', () => {
+  music.play().catch(() => {
+    document.addEventListener('click', () => music.play(), { once: true });
+  });
+});
+
+// ── PAGE SWITCH ──
+function switchPage(id, stepIndex) {
+  document.querySelectorAll('.page').forEach(p => {
+    p.classList.remove('active');
+  });
+  const target = document.getElementById(id);
+  target.classList.add('active');
+}
+
+// ── BOT COUNT ──
+let count = 128;
+function updateCount() {
+  document.querySelectorAll('#botCount, #botCountOwner').forEach(el => el.textContent = count);
+}
+setInterval(() => { count++; updateCount(); }, 4000);
+
+// ── GENERATE CODE ──
+let lastCode = '';
+document.getElementById('submit').addEventListener('click', async () => {
+  const raw = document.getElementById('number').value.replace(/[^0-9]/g, '');
+  const pairEl = document.getElementById('pair');
+  if (raw.length < 10) {
+    pairEl.textContent = '✗ Please enter a valid phone number';
+    pairEl.className = 'pair-result error';
+    return;
+  }
+  pairEl.textContent = 'Generating your code...';
+  pairEl.className = 'pair-result';
+  try {
+    const { data } = await axios(`/code?number=${raw}`);
+    lastCode = data.code;
+    pairEl.textContent = data.code;
+    pairEl.className = 'pair-result has-code';
+  } catch {
+    pairEl.textContent = '⚠  Service temporarily unavailable';
+    pairEl.className = 'pair-result error';
+  }
+});
+
+// ── COPY CODE ──
+function copyCode() {
+  if (!lastCode) return;
+  navigator.clipboard.writeText(lastCode).catch(() => {});
+}
+</script>
+</body>
+</html>
